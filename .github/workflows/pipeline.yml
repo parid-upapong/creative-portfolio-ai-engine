@@ -1,0 +1,89 @@
+name: OVERLORD CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, staging ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY_PREFIX: overlord
+
+jobs:
+  test-and-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js (Backend/Frontend)
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+          
+      - name: Install & Test Backend
+        run: |
+          cd backend
+          npm ci
+          npm test
+
+      - name: Setup Python (ML Engine)
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          
+      - name: Lint ML Engine
+        run: |
+          cd ml_engine
+          pip install flake8
+          flake8 .
+
+  build-and-push:
+    needs: test-and-lint
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [backend, ml_engine, frontend]
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build, tag, and push image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY_PREFIX }}-${{ matrix.service }}:$IMAGE_TAG ./${{ matrix.service }}
+          docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY_PREFIX }}-${{ matrix.service }}:$IMAGE_TAG
+
+  deploy-to-eks:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Kubeconfig
+        run: aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name overlord-cluster-prod
+
+      - name: Deploy Backend & Run Migrations
+        run: |
+          helm upgrade --install backend ./charts/backend \
+            --set image.tag=${{ github.sha }} \
+            --values ./charts/backend/values-prod.yaml
+
+      - name: Deploy ML Engine (Chameleon)
+        run: |
+          helm upgrade --install ml-engine ./charts/ml-engine \
+            --set image.tag=${{ github.sha }} \
+            --values ./charts/ml-engine/values-prod.yaml
