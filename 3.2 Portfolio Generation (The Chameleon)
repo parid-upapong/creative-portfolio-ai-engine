@@ -1,0 +1,1 @@
+SELECT * FROM assets ORDER BY embedding <=> [brief_embedding] LIMIT 12;
