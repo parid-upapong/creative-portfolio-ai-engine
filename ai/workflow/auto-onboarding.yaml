@@ -1,0 +1,38 @@
+# Definition of the Automated Artist Workflow
+# This YAML defines how the platform handles new artwork uploads automatically.
+
+workflow:
+  name: ArtistAssetOnboarding
+  trigger:
+    type: file_upload
+    target: /raw-assets/
+
+  stages:
+    - stage: AssetAnalysis
+      processor: vision-transformer-v4
+      actions:
+        - extract_style: ["Cyberpunk", "Impressionist", "Vector"]
+        - identify_subject: ["Character", "Environment", "UI"]
+        - estimate_complexity: 1-10
+      output: metadata_json
+
+    - stage: Optimization
+      processor: image-magick-service
+      actions:
+        - generate_webp_variants: [400, 800, 1600]
+        - apply_dynamic_watermark: 
+            text: "artist_name"
+            opacity: 0.3
+
+    - stage: SearchIndexing
+      processor: vector-db-ingestor
+      input: metadata_json
+      actions:
+        - create_embedding: true
+        - update_artist_profile_stats: true
+
+    - stage: PortfolioMatching
+      processor: lead-matching-engine
+      actions:
+        - notify_relevant_clients: true
+        - update_dynamic_portfolio: "Suggested for high-tier gaming clients"
