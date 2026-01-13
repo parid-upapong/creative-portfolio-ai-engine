@@ -1,0 +1,30 @@
+{
+  "module": "MatchingEngine",
+  "version": "1.0.0",
+  "logic_flow": {
+    "step_1_extraction": {
+      "input": "client_brief",
+      "process": "NLP_Entity_Extraction",
+      "attributes": ["style", "complexity", "color_scheme", "usage_rights"]
+    },
+    "step_2_vector_search": {
+      "query": "Vault_Assets",
+      "method": "Cosine_Similarity",
+      "threshold": 0.75,
+      "limit": 12
+    },
+    "step_3_site_generation": {
+      "template_engine": "Dynamic_React_Hydration",
+      "features": [
+        "Lazy_Loading",
+        "Analytics_Pixel",
+        "Auto_Watermark"
+      ]
+    }
+  },
+  "data_dependencies": {
+    "Artist_Vault": "PostgreSQL + Vector Extension",
+    "Asset_Files": "AWS S3 / Cloudflare R2",
+    "Metadata": "NoSQL (MongoDB) for flexible tagging"
+  }
+}
