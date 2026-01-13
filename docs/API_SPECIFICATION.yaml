@@ -1,0 +1,64 @@
+openapi: 3.0.0
+info:
+  title: OVERLORD API - Vault & Chameleon Services
+  version: 1.0.0
+  description: API for managing digital assets and generating AI-driven portfolios.
+
+paths:
+  /vault/upload:
+    post:
+      summary: Initialize asset upload
+      security:
+        - BearerAuth: []
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  uploadUrl: { type: string }
+                  assetId: { type: string }
+
+  /chameleon/generate:
+    post:
+      summary: Create a personalized portfolio from a brief
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [briefText]
+              properties:
+                briefText: { type: string }
+                targetIndustry: { type: string }
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  portfolioUrl: { type: string }
+                  matchedAssets:
+                    type: array
+                    items: { $ref: '#/components/schemas/Asset' }
+
+components:
+  schemas:
+    Asset:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        thumbnailUrl: { type: string }
+        analysis:
+          type: object
+          properties:
+            primaryStyle: { type: string }
+            confidence: { type: number }
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
