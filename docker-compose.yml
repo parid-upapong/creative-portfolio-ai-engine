@@ -1,44 +1,38 @@
 version: '3.8'
 
 services:
-  # Message Broker for decoupling
-  rabbitmq:
-    image: rabbitmq:3-management
+  db:
+    image: ankane/pgvector:latest # Specialized image with pgvector pre-installed
     ports:
-      - "5672:5672"
-      - "15672:15672"
-
-  # Metadata and Asset State
-  postgres:
-    image: postgres:15-alpine
+      - "5432:5432"
     environment:
-      POSTGRES_DB: overlord_vault
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: secret_password
+      POSTGRES_USER: overlord_admin
+      POSTGRES_PASSWORD: debug_password
+      POSTGRES_DB: overlord_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
-  # Vector DB for the "Chameleon" matching engine
-  qdrant:
-    image: qdrant/qdrant
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
     ports:
-      - "6333:6333"
-
-  # API Gateway for Ingestion
-  api-gateway:
-    build: ./services/ingestion
+      - "3001:3000"
     environment:
-      - DATABASE_URL=postgresql://admin:secret_password@postgres:5432/overlord_vault
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
-      - AWS_S3_BUCKET=overlord-vault-production
+      - DATABASE_URL=postgresql://overlord_admin:debug_password@db:5432/overlord_dev
+    depends_on:
+      - db
 
-  # AI Worker (Scaling targets)
-  ai-processor:
-    build: ./services/worker-ai
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+  ml_engine:
+    build:
+      context: ./ml_engine
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8000"
     environment:
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - DATABASE_URL=postgresql://overlord_admin:debug_password@db:5432/overlord_dev
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
