@@ -1,0 +1,56 @@
+// This schema reflects the "Vault" Core and matches the SQL definitions provided.
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum AssetStatus {
+  UPLOADING
+  PROCESSING
+  READY
+  FAILED
+}
+
+model Asset {
+  id              String         @id @default(uuid())
+  userId          String
+  title           String
+  description     String?
+  originalUrl     String         // S3/GCS Source link
+  thumbnailUrl    String?
+  fileSize        Int
+  mimeType        String
+  status          AssetStatus    @default(UPLOADING)
+  
+  // AI Vision Results Relation
+  analysis        AssetAnalysis?
+  
+  // Vector for "Chameleon" Matching (Handled via raw SQL for pgvector)
+  // embedding    Unsupported("vector(512)")?
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model AssetAnalysis {
+  id               String   @id @default(uuid())
+  assetId          String   @unique
+  asset            Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  
+  primaryStyle     String?  // e.g., "Cyberpunk"
+  medium           String?  // e.g., "3D Render"
+  moodTags         String[] // e.g., ["gloomy", "vibrant"]
+  
+  colorPalette     Json?    // Dominant hex codes
+  compositionScore Float?
+  tags             Json     // Label: Confidence map
+  
+  processedAt      DateTime @default(now())
+}
